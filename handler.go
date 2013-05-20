@@ -36,7 +36,9 @@ func Wrap(root http.Handler, prefix string, paths Paths) *GoImports {
 	for _, p := range paths {
 		switch p.VCS {
 		case "git", "hg", "bzr", "svn":
-			s := path.Join(h.prefix, path.Base(p.Path))
+			base := path.Base(p.Path)
+			base = base[:len(base)-len(path.Ext(base))]
+			s := path.Join(h.prefix, base)
 			h.paths[s] = p
 		default:
 			panic(fmt.Errorf("goimport: unknown vcs %s", p.VCS))
@@ -51,10 +53,16 @@ func (h *GoImports) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 }
 
+type tmplPath struct {
+	Path string
+	VCS  string
+	Repo string
+}
+
 func (h *GoImports) tryServe(w http.ResponseWriter, req *http.Request) bool {
 	var data struct {
 		Host    string
-		Imports []Path
+		Imports []tmplPath
 	}
 	query := req.URL.Query()
 	_, goget := query["go-get"]
@@ -65,13 +73,21 @@ func (h *GoImports) tryServe(w http.ResponseWriter, req *http.Request) bool {
 	data.Host = req.Host
 	if goget {
 		if path == "" {
-			for _, p := range h.paths {
-				data.Imports = append(data.Imports, p)
+			for k, p := range h.paths {
+				data.Imports = append(data.Imports, tmplPath{
+					Path: k,
+					VCS:  p.VCS,
+					Repo: p.Path,
+				})
 			}
 			render(w, data)
 			return true
 		} else if p, ok := h.paths[path]; ok {
-			data.Imports = append(data.Imports, p)
+			data.Imports = append(data.Imports, tmplPath{
+				Path: path,
+				VCS:  p.VCS,
+				Repo: p.Path,
+			})
 			render(w, data)
 			return true
 		}

@@ -9,7 +9,7 @@ var tmpl = template.Must(template.New("tmpl").Parse(`<html>
 <head>
 {{$host := .Host}}
 {{range .Imports}}
-<meta name="go-import" content="{{$host}} {{.VCS}} {{.Path}}">
+<meta name="go-import" content="{{$host}}/{{.Path}} {{.VCS}} {{.Repo}}">
 {{end}}
 </head>
 <body>
