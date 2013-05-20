@@ -24,5 +24,9 @@ TODO:
 - Some kind of version handling would be swell
 - Benchmark tryServe; needs to be super lean since it's hit by every request.
 - More robust repo -> path mapping?
+- Add a README
+- Callback for ?go-get requests; would allow for stats collection.
+- Let user provide a handler to use instead of the godoc.org redirect...could
+  put the repo path in URL.RawQuery or something.
 */
 package goimport
