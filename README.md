@@ -1,4 +1,5 @@
-/*
+# goimport
+
 Package goimport wraps an http.Handler and provides redirection to
 godoc.org or to a remote import path for `?go-get=1` queries. This allows
 you to use your domain for import paths while hosting your packages
@@ -19,5 +20,11 @@ Note that the go tool always passes the `?go-get=1` query in the URL. When the
 query is not found, the HTTP client is given a 302 redirect to
 godoc.org/{host}/{prefix}/basepath. For all paths that do not match the repo
 paths, the passed in http.Handler is used.
-*/
-package goimport
+
+Read the [docs](http://godoc.org/j4k.co/goimport).
+
+## Installation
+
+    go get j4k.co/goimport
+
+New to Go? Have a look at how [import paths work](http://golang.org/doc/code.html#remote).
