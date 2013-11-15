@@ -23,7 +23,7 @@ type Packages struct {
 	matchHomepage *regexp.Regexp
 }
 
-// FindPackages is called by goimport.Wrap when setting up a list of
+// FindPackages is called by goimport.Handler when setting up a list of
 // package paths.
 func (p Packages) FindPackages(dest goimport.PackageSetter) {
 	if !p.once {
