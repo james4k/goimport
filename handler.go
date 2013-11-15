@@ -4,66 +4,86 @@ import (
 	"fmt"
 	"net/http"
 	"path"
+	"sync"
 )
 
-type Path struct {
-	VCS  string // git, hg, bzr, or svn
-	Path string // remote import path
+// Handler is the http.Handler
+type Handler struct {
+	mu    sync.RWMutex
+	root  http.Handler
+	paths map[string]Package
+	srcs  map[PackageFinder]Packages
 }
 
-type Paths []Path
-
-type GoImports struct {
-	root   http.Handler
-	prefix string
-	paths  map[string]Path
-}
-
-// Wrap takes your root http.Handler and returns a wrapper which serves out
+// Handle takes a root http.Handler and returns a wrapper which serves out
 // go-import meta tags for the go tool, or redirects to godoc.org when there is
 // no ?go-get=1 query. For anything that does not match, your root handler is
-// called
-func Wrap(root http.Handler, prefix string, paths Paths) *GoImports {
-	prefix = path.Clean(prefix)
-	if len(prefix) > 0 && prefix[0] == '/' {
-		prefix = prefix[1:]
+// called. If root is nil, we use http.NotFoundHandler.
+func Handle(root http.Handler, sources ...PackageFinder) *Handler {
+	if root == nil {
+		root = http.NotFoundHandler()
 	}
-	h := &GoImports{
-		root:   root,
-		prefix: prefix,
-		paths:  make(map[string]Path),
+	h := &Handler{
+		root:  root,
+		paths: make(map[string]Package),
+		srcs:  make(map[PackageFinder]Packages),
 	}
-	for _, p := range paths {
-		switch p.VCS {
-		case "git", "hg", "bzr", "svn":
-			base := path.Base(p.Path)
-			base = base[:len(base)-len(path.Ext(base))]
-			s := path.Join(h.prefix, base)
-			h.paths[s] = p
-		default:
-			panic(fmt.Errorf("goimport: unknown vcs %s", p.VCS))
-		}
+	for _, src := range sources {
+		go src.FindPackages(h)
 	}
 	return h
 }
 
-func (h *GoImports) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+// ServeHTTP serves our redirect, html meta tag, or the root
+// http.Handler.
+func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	if !h.tryServe(w, req) {
 		h.root.ServeHTTP(w, req)
 	}
 }
 
-type tmplPath struct {
+func validVCS(vcs string) bool {
+	switch vcs {
+	case "git", "hg", "bzr", "svn":
+		return true
+	default:
+		return false
+	}
+}
+
+// SetPackages is called by PackageFinders for updating our set of
+// packages.
+func (h *Handler) SetPackages(src PackageFinder, pkgs []Package) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	prevPkgs, ok := h.srcs[src]
+	if ok {
+		for _, p := range prevPkgs {
+			delete(h.paths, p.Path)
+		}
+	}
+	for i := range pkgs {
+		p := &pkgs[i]
+		if validVCS(p.VCS) {
+			s := path.Clean(p.Path)
+			p.Path = s
+			h.paths[s] = *p
+		} else {
+			panic(fmt.Errorf("goimport: unknown vcs %s", p.VCS))
+		}
+	}
+	h.srcs[src] = pkgs
+}
+
+type tmplData struct {
+	Host string
 	Path string
 	VCS  string
 	Repo string
 }
 
-func (h *GoImports) tryServe(w http.ResponseWriter, req *http.Request) bool {
-	var data struct {
-		Host    string
-		Imports []tmplPath
-	}
+func (h *Handler) tryServe(w http.ResponseWriter, req *http.Request) bool {
+	var data tmplData
 	query := req.URL.Query()
 	_, goget := query["go-get"]
 	path := req.URL.Path
@@ -71,31 +91,33 @@ func (h *GoImports) tryServe(w http.ResponseWriter, req *http.Request) bool {
 		path = path[1:]
 	}
 	data.Host = req.Host
-	if goget {
-		if path == "" {
-			for k, p := range h.paths {
-				data.Imports = append(data.Imports, tmplPath{
-					Path: k,
-					VCS:  p.VCS,
-					Repo: p.Path,
-				})
-			}
-			render(w, data)
-			return true
-		} else if p, ok := h.paths[path]; ok {
-			data.Imports = append(data.Imports, tmplPath{
-				Path: path,
-				VCS:  p.VCS,
-				Repo: p.Path,
-			})
-			render(w, data)
-			return true
-		}
-	} else {
-		if _, ok := h.paths[path]; ok {
-			http.Redirect(w, req, "http://godoc.org/"+req.Host+"/"+path, 302)
-			return true
-		}
+	if goget && h.goget(&data, path) {
+		render(w, data)
+		return true
+	} else if url, ok := h.godocRedirect(path, req.Host); ok {
+		http.Redirect(w, req, url, 302)
+		return true
 	}
 	return false
+}
+
+func (h *Handler) goget(data *tmplData, path string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if p, ok := h.paths[path]; ok {
+		data.Path = p.RootPath
+		data.VCS = p.VCS
+		data.Repo = p.TargetURL
+		return true
+	}
+	return false
+}
+
+func (h *Handler) godocRedirect(path, host string) (string, bool) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	if _, ok := h.paths[path]; ok {
+		return "http://godoc.org/" + host + "/" + path, true
+	}
+	return "", false
 }

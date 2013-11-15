@@ -2,15 +2,28 @@ package goimport_test
 
 import (
 	"j4k.co/goimport"
+	"j4k.co/goimport/github"
 	"net/http"
 )
 
 func ExampleWrap() {
-	// root could be your router from gorilla/mux (or your router of choice)
+	// root could be your router from gorilla/mux (or your router of
+	// choice), or a subhandler if you want to use a path prefix like
+	// /pkg/ or /go/.
 	root := http.NotFoundHandler()
-	http.Handle("/", goimport.Wrap(root, "/", goimport.Paths{
-		{"git", "github.com/username/repo1"},
-		{"git", "github.com/username/repo2"},
-		{"bzr", "launchpad.net/lpadrepo"},
+	http.Handle("/", goimport.Handle(root, goimport.Packages{
+		{
+			VCS:       "git",
+			Path:      "repo1",
+			TargetURL: "github.com/username/repo1",
+		},
+		{
+			VCS:       "bzr",
+			Path:      "repo2",
+			TargetURL: "launchpad.net/repo2",
+		},
+	}, github.Packages{
+		User:             "james4k",
+		FilterByHomepage: "(http://)?j4k.co/",
 	}))
 }
