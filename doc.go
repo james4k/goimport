@@ -7,12 +7,10 @@ elsewhere. Read more: http://golang.org/cmd/go/#hdr-Remote_import_path_syntax
 In the following code, goimport.Handle will redirect `go get` requests
 of example.com/somerepo to github.com/someuser/somerepo.
 
-	goimport.Handle(router, goimport.Packages{
-		{
-			VCS:       "git",
-			Path:      "somerepo1",
-			TargetURL: "github.com/someuser/somerepo",
-		},
+	goimport.Handle(router, github.Packages{
+		VCS:       "git",
+		Path:      "somerepo1",
+		TargetURL: "github.com/someuser/somerepo",
 	})
 
 Note that the go tool always passes the `?go-get=1` query in the URL. When the

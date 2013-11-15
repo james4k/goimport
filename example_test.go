@@ -6,7 +6,7 @@ import (
 	"net/http"
 )
 
-func ExampleWrap() {
+func ExampleHandle() {
 	// root could be your router from gorilla/mux (or your router of
 	// choice), or a subhandler if you want to use a path prefix like
 	// /pkg/ or /go/.
