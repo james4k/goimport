@@ -1,9 +1,9 @@
 # goimport
 
-Package goimport wraps an http.Handler and provides redirection to
-godoc.org or to a remote import path for `?go-get=1` queries. This allows
-you to use your domain for import paths while hosting your packages
-elsewhere. Read more: http://golang.org/cmd/go/#hdr-Remote_import_path_syntax
+Package goimport provides redirection to godoc.org or to a remote import
+path for `go get` requests. This allows you to use your domain for
+import paths while hosting your packages elsewhere. Read more:
+http://golang.org/cmd/go/#hdr-Remote_import_path_syntax
 
 Read the [docs](http://j4k.co/goimport), and note the
 [github](http://j4k.co/goimport/github) package.
